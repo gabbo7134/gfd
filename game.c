@@ -32,7 +32,7 @@
 /* Slime dimensions */
 #define SF_W       32
 #define SF_H       32
-#define SF_COLS     7
+#define SF_COLS     4
 #define S_SCALE     2.0f
 #define S_DISP_W   (SF_W * S_SCALE)
 #define S_DISP_H   (SF_H * S_SCALE)
@@ -220,7 +220,7 @@ static void resolve_collisions(Game *gp)
 
 /* ────────────────────────────────────────────────────────────────
  * PHYSICS THREAD
- * ──────────────────────────────────────────────────��─────────────
+ * ────────────────────────────────────────────────────────────────
  */
 
 static void *physics_fn(void *arg)
