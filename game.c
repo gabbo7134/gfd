@@ -8,9 +8,10 @@
 #include <string.h>
 #include <time.h>
 
-/* ─────────────────────────────────────────────────────────────────────
+/* ────────────────────────────────────────────────────────────────
  * CONSTANTS
- * ───────────────────────────────────────────────────────────────────── */
+ * ────────────────────────────────────────────────────────────────
+ */
 
 #define SCREEN_W   1280
 #define SCREEN_H    720
@@ -35,6 +36,10 @@
 #define S_SCALE     2.0f
 #define S_DISP_W   (SF_W * S_SCALE)
 #define S_DISP_H   (SF_H * S_SCALE)
+
+/* Door dimensions */
+#define DF_W       48
+#define DF_H       32
 
 #define MAX_PLAT   10
 #define MAX_SLIMES  5
@@ -74,9 +79,10 @@ typedef struct {
     Phase  phase;
 } Game;
 
-/* ─────────────────────────────────────────────────────────────────────
+/* ────────────────────────────────────────────────────────────────
  * SHARED STATE
- * ───────────────────────────────────────────────────────────────────── */
+ * ────────────────────────────────────────────────────────────────
+ */
 
 static Game            g;
 static pthread_mutex_t g_mu = PTHREAD_MUTEX_INITIALIZER;
@@ -89,7 +95,10 @@ static struct {
 static atomic_bool g_reset;
 static atomic_bool g_quit;
 
-/* ───────────────────────────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────────
+ * UTILS
+ * ────────────────────────────────────────────────────────────────
+ */
 
 static bool rects_overlap(Rect a, Rect b)
 {
@@ -109,7 +118,10 @@ static void precise_sleep(double seconds)
     while (GetTime() < target) {}
 }
 
-/* ───────────────────────────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────────
+ * GAME INIT
+ * ────────────────────────────────────────────────────────────────
+ */
 
 static void game_init(Game *gp)
 {
@@ -129,7 +141,7 @@ static void game_init(Game *gp)
     gp->nplats = sizeof(plats)/sizeof(plats[0]);
     memcpy(gp->plats, plats, sizeof(plats));
 
-    gp->door = (Rect){ 1170, 280, 64, 72 };
+    gp->door = (Rect){ 1170, 280, DF_W, DF_H };
 
     gp->player.x = 80;
     gp->player.y = 668 - P_DISP_H;
@@ -152,7 +164,10 @@ static void game_init(Game *gp)
     }
 }
 
-/* ───────────────────────────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────────
+ * COLLISIONS
+ * ────────────────────────────────────────────────────────────────
+ */
 
 static void resolve_collisions(Game *gp)
 {
@@ -203,7 +218,10 @@ static void resolve_collisions(Game *gp)
     }
 }
 
-/* ───────────────────────────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────────
+ * PHYSICS THREAD
+ * ──────────────────────────────────────────────────��─────────────
+ */
 
 static void *physics_fn(void *arg)
 {
@@ -272,7 +290,10 @@ static void *physics_fn(void *arg)
     return NULL;
 }
 
-/* ───────────────────────────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────────
+ * AI THREAD
+ * ────────────────────────────────────────────────────────────────
+ */
 
 static void *ai_fn(void *arg)
 {
@@ -332,15 +353,20 @@ static void *ai_fn(void *arg)
 
     return NULL;
 }
-/* ─────────────────────────────────────────────────────────────────────
- * MAIN + RENDERING (NO SPRITES)
- * ───────────────────────────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────────
+ * MAIN + RENDERING (SPRITES)
+ * ────────────────────────────────────────────────────────────────
+ */
 
 int main(void)
 {
     SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_HIGHDPI);
-    InitWindow(SCREEN_W, SCREEN_H, "Dungeon Platformer — No Sprites");
+    InitWindow(SCREEN_W, SCREEN_H, "Dungeon Platformer — Sprites");
     SetTargetFPS(60);
+
+    Texture2D tex_player = LoadTexture("sprites_characters_player.png");
+    Texture2D tex_slime  = LoadTexture("sprites_characters_slime.png");
+    Texture2D tex_door   = LoadTexture("wooden_door.png");
 
     pthread_mutex_init(&inp.mu, NULL);
     atomic_store(&g_reset, false);
@@ -390,9 +416,13 @@ int main(void)
         }
 
         /* Door */
-        DrawRectangleRec(
+        DrawTexturePro(
+            tex_door,
+            (Rectangle){0, 0, (float)tex_door.width, (float)tex_door.height},
             (Rectangle){snap.door.x, snap.door.y, snap.door.w, snap.door.h},
-            (Color){200,180,60,255}
+            (Vector2){0, 0},
+            0.0f,
+            WHITE
         );
         DrawRectangleLinesEx(
             (Rectangle){snap.door.x-4, snap.door.y-4,
@@ -400,38 +430,35 @@ int main(void)
             2,
             (Color){255,220,60,180}
         );
-        DrawText("EXIT",
-                 snap.door.x + 6,
-                 snap.door.y - 20,
-                 14,
-                 (Color){255,230,100,220});
 
         /* Slimes */
         for (int i = 0; i < snap.nslimes; i++) {
             Slime *s = &snap.slimes[i];
+            int s_frame = (int)(GetTime() * 8.0f) % SF_COLS;
+            float s_fw = (float)SF_W;
+            float s_fh = (float)SF_H;
+            float s_flip = s->face_right ? 1.0f : -1.0f;
+            float s_src_x = s->face_right ? s_frame * s_fw : (s_frame + 1) * s_fw;
 
-            float cx = s->x + S_DISP_W*0.5f;
-            float cy = s->y + S_DISP_H*0.5f;
-            float r  = S_DISP_W*0.5f;
+            Rectangle src = { s_src_x, 0, s_fw * s_flip, s_fh };
+            Rectangle dst = { s->x, s->y, S_DISP_W, S_DISP_H };
 
-            DrawCircleV((Vector2){cx,cy}, r, (Color){120,200,120,255});
-            DrawCircleLines(cx,cy,r,(Color){40,80,40,255});
-
-            float ex = s->face_right ? cx + r*0.35f : cx - r*0.35f;
-            DrawCircleV((Vector2){ex, cy - r*0.15f}, r*0.18f, WHITE);
-            DrawCircleV((Vector2){ex, cy - r*0.15f}, r*0.08f, BLACK);
+            DrawTexturePro(tex_slime, src, dst, (Vector2){0, 0}, 0.0f, WHITE);
         }
 
         /* Player */
         {
             Player *p = &snap.player;
-            Rectangle pr = { p->x, p->y, P_DISP_W, P_DISP_H };
+            int p_frame = (int)(GetTime() * 10.0f) % PF_COLS;
+            float p_fw = (float)PF_W;
+            float p_fh = (float)PF_H;
+            float p_flip = p->face_right ? 1.0f : -1.0f;
+            float p_src_x = p->face_right ? p_frame * p_fw : (p_frame + 1) * p_fw;
 
-            DrawRectangleRounded(pr, 0.15f, 8, (Color){50,150,230,255});
-            DrawRectangleLinesEx(pr, 2, (Color){20,60,90,255});
+            Rectangle src = { p_src_x, 0, p_fw * p_flip, p_fh };
+            Rectangle dst = { p->x, p->y, P_DISP_W, P_DISP_H };
 
-            float ex = p->face_right ? p->x + P_DISP_W - 14 : p->x + 6;
-            DrawRectangle(ex, p->y + 20, 8, 8, WHITE);
+            DrawTexturePro(tex_player, src, dst, (Vector2){0, 0}, 0.0f, WHITE);
         }
 
         DrawText("← → / A D : Move     Space / W / ↑ : Jump     R : Restart",
@@ -459,6 +486,10 @@ int main(void)
     atomic_store(&g_quit, true);
     pthread_join(th_phys, NULL);
     pthread_join(th_ai,   NULL);
+
+    UnloadTexture(tex_player);
+    UnloadTexture(tex_slime);
+    UnloadTexture(tex_door);
 
     CloseWindow();
     return 0;
