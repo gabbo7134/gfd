@@ -33,9 +33,6 @@
 #define SF_W       32
 #define SF_H       32
 #define SF_COLS     4
-#define SF_PAD_L   11
-#define SF_PAD_R    8
-#define SF_PAD_X   17
 #define S_SCALE     2.0f
 #define S_DISP_W   (SF_W * S_SCALE)
 #define S_DISP_H   (SF_H * S_SCALE)
@@ -448,10 +445,7 @@ int main(void)
             float s_fw = (float)SF_W;
             float s_fh = (float)SF_H;
             float s_flip = s->face_right ? 1.0f : -1.0f;
-            float s_src_x = SF_PAD_L + (s_frame * (s_fw + SF_PAD_X));
-            if (!s->face_right) {
-                s_src_x += s_fw;
-            }
+            float s_src_x = s->face_right ? s_frame * s_fw : (s_frame + 1) * s_fw;
 
             Rectangle src = { s_src_x, 0, s_fw * s_flip, s_fh };
             Rectangle dst = { s->x, s->y, S_DISP_W, S_DISP_H };
