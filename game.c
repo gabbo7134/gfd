@@ -331,6 +331,13 @@ static void *ai_fn(void *arg)
                     s->face_right = false;
                 }
 
+                s->anim_t += dt;
+                const float frame_time = 1.0f / 8.0f;
+                while (s->anim_t >= frame_time) {
+                    s->anim_t -= frame_time;
+                    s->anim_col = (s->anim_col + 1) % SF_COLS;
+                }
+
                 float sx = s->x + S_DISP_W*0.32f;
                 float sy = s->y + S_DISP_H*0.35f;
                 float sw = S_DISP_W*0.36f;
@@ -434,7 +441,7 @@ int main(void)
         /* Slimes */
         for (int i = 0; i < snap.nslimes; i++) {
             Slime *s = &snap.slimes[i];
-            int s_frame = (int)(GetTime() * 8.0f) % SF_COLS;
+            int s_frame = s->anim_col;
             float s_fw = (float)SF_W;
             float s_fh = (float)SF_H;
             float s_flip = s->face_right ? 1.0f : -1.0f;
